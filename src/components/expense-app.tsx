@@ -8,6 +8,8 @@ import { createDemoExpense, DEMO_STORAGE_KEY, loadDemoExpenses, persistDemoExpen
 import { amountInput, blankLine, coupleMembers, currencies, defaultParticipants, localDate, makeExpenseInput, MAX_LINES, money, sampleReceipt, splitItems, toCents, validateImage, type CoupleMemberId, type Currency, type DraftLine, type Expense, type Participant, type Receipt, type SplitMode } from "@/lib/domain";
 import { memberName, summarizeLedger, ticketDebt } from "@/lib/ledger";
 import { CURRENT_MEMBER_KEY, loadCurrentMember } from "@/lib/preferences";
+import { prepareImage } from "@/lib/image-prepare";
+import { CropDialog } from "./crop-dialog";
 import { Icon } from "./icon";
 
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
@@ -60,6 +62,8 @@ function App() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const previewRef = useRef("");
+  const [cropSource, setCropSource] = useState<File | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const cameraInput = useRef<HTMLInputElement>(null);
   const uploadInput = useRef<HTMLInputElement>(null);
   const saveAttempt = useRef<{ serialized: string; key: string } | null>(null);
@@ -99,6 +103,7 @@ function App() {
     previewRef.current = "";
     setPreview("");
     setFile(null);
+    setCropSource(null);
     setNotice(null);
   }, []);
 
@@ -183,15 +188,32 @@ function App() {
     endSession();
   }
 
-  function chooseFile(nextFile?: File) {
-    if (!nextFile || locked) return;
+  // Convierte (HEIC→JPEG), reduce de tamaño y abre el editor de recorte.
+  async function chooseFile(nextFile?: File) {
+    if (!nextFile || locked || preparing) return;
+    setPreparing(true);
+    setNotice({ kind: "info", message: "Preparando la foto…" });
     try {
-      validateImage(nextFile);
-      const nextPreview = URL.createObjectURL(nextFile);
+      const prepared = await prepareImage(nextFile);
+      setCropSource(prepared);
+      setNotice(null);
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setPreparing(false);
+    }
+  }
+
+  // Foto ya convertida y recortada: la validamos y la dejamos lista para analizar.
+  function acceptPhoto(finalFile: File) {
+    setCropSource(null);
+    try {
+      validateImage(finalFile);
+      const nextPreview = URL.createObjectURL(finalFile);
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
       previewRef.current = nextPreview;
       setPreview(nextPreview);
-      setFile(nextFile);
+      setFile(finalFile);
       setNotice(null);
     } catch (error) {
       reportError(error);
@@ -352,7 +374,7 @@ function App() {
 
       <main className="main-content">
         <section className="hero">
-          <div><p className="eyebrow">MENOS CUENTAS. MÁS VIDA JUNTOS.</p><h1>Lo compartido,<br /><span>bien repartido.</span></h1><p className="hero-description">Un ticket, un par de checks y cada uno con su parte.<br className="desktop-only" /> Sin calculadora. Sin cuentas pendientes.</p></div>
+          <div><p className="eyebrow">MENOS CONTAS. MENOS DISCUSIÓNS. MÁIS VIDA XUNTOS.</p><h1>O compartido,<br /><span>ben repartido.</span></h1><p className="hero-description">Un ticket, un par de checks e cada un coa su parte.<br className="desktop-only" /> Sin calculadora. Sin contas pendientes.</p></div>
           <div className="hero-art" aria-hidden="true"><div className="art-circle" /><div className="mini-receipt"><Icon name="receipt" /><span>EL PLAN DE HOY</span><i /><i /><strong>A medias <span>✓</span></strong><div className="receipt-teeth" /></div><div className="art-badge">50 <small>/</small> 50</div><span className="art-spark">✦</span></div>
         </section>
 
@@ -375,12 +397,12 @@ function App() {
                 <label>¿Quién ha pagado la compra?<select value={paidById} onChange={(event) => setPaidById(event.target.value as CoupleMemberId)}>{coupleMembers.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
                 <p className="field-hint">Recordamos quién registra en este navegador. Por defecto también paga; puedes cambiarlo si solo estás subiendo su ticket. Los nombres de la pareja son siempre Adela y Martín.</p>
               </div>
-              <div className={`dropzone ${preview ? "with-preview" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); chooseFile(event.dataTransfer.files[0]); }}>
+              <div className={`dropzone ${preview ? "with-preview" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void chooseFile(event.dataTransfer.files[0]); }}>
                 {preview ? <div className="photo-preview"><Image src={preview} alt="Vista previa del ticket seleccionado" unoptimized width={180} height={170} /><div><strong>{file?.name}</strong><p>Lista para revisar</p><button type="button" className="text-button" onClick={clearPhoto}>Quitar foto</button></div></div> : <><span className="upload-icon"><Icon name="camera" /></span><h3>Tu próxima cuenta, resuelta</h3><p>Una foto nítida, con el ticket completo.</p></>}
-                <div className="upload-actions"><button type="button" className="button primary" onClick={() => cameraInput.current?.click()}><Icon name="camera" />Tomar foto</button><button type="button" className="button secondary" onClick={() => uploadInput.current?.click()}><Icon name="upload" />Subir imagen</button></div>
-                <input ref={cameraInput} hidden type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Tomar foto del ticket" onChange={(event) => { chooseFile(event.target.files?.[0]); event.target.value = ""; }} />
-                <input ref={uploadInput} hidden type="file" accept="image/jpeg,image/png,image/webp" aria-label="Seleccionar imagen del ticket" onChange={(event) => { chooseFile(event.target.files?.[0]); event.target.value = ""; }} />
-                <span className="upload-footnote">JPG, PNG o WebP · Máximo 8 MB · Vista previa local</span>
+                <div className="upload-actions"><button type="button" className="button primary" disabled={preparing} onClick={() => cameraInput.current?.click()}><Icon name="camera" />Tomar foto</button><button type="button" className="button secondary" disabled={preparing} onClick={() => uploadInput.current?.click()}><Icon name="upload" />Subir imagen</button></div>
+                <input ref={cameraInput} hidden type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" capture="environment" aria-label="Tomar foto del ticket" onChange={(event) => { void chooseFile(event.target.files?.[0]); event.target.value = ""; }} />
+                <input ref={uploadInput} hidden type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" aria-label="Seleccionar imagen del ticket" onChange={(event) => { void chooseFile(event.target.files?.[0]); event.target.value = ""; }} />
+                <span className="upload-footnote">JPG, PNG, WebP o HEIC (iPhone) · Se convierte y optimiza solo · Máximo 8 MB</span>
               </div>
               <div className="capture-footer">{IS_DEMO ? <><span>¿Quieres ver cómo funciona?</span><button type="button" className="text-button" onClick={loadExample}>Cargar ticket de ejemplo <Icon name="arrow" /></button></> : <><span>Revisa la privacidad del proveedor de IA de tu backend.</span><button type="button" className="button primary small" disabled={!file} onClick={() => void analyze()}>Interpretar con IA <Icon name="arrow" /></button></>}</div>
             </fieldset></section>
@@ -401,6 +423,15 @@ function App() {
               {receiptTotal !== null && <p className={`receipt-check ${hasInvalidAmounts || receiptSum !== receiptTotal ? "mismatch" : ""}`}><Icon name="receipt" />Total leído: {money(receiptTotal, currency)} · Suma de todas las líneas: {money(receiptSum, currency)}{!hasInvalidAmounts && receiptSum === receiptTotal ? " · Cuadra ✓" : " · Revisa la diferencia"}</p>}
               {receiptWarnings.length > 0 && <ul className="receipt-warnings">{receiptWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
             </fieldset></section>
+
+            <button type="button" className="text-button new-draft-button" style={{
+    width: "100%",
+    color: "#fff",
+    background: "#d92d20",
+    border: "1px solid #b42318",
+    fontWeight: 700,
+    borderRadius: 16,
+  }} disabled={locked} onClick={() => { if (!hasDraft || window.confirm("¿Descartar el borrador actual y empezar de nuevo?")) resetDraft(); }}>Limpiar borrador</button>
 
             <section className="card"><SectionHeading number="03" title="¿Entre quiénes?" subtitle="El reparto se aplica solo a lo compartido; lo individual se suma entero a su propietario." /><fieldset disabled={locked} className="field-reset">
               <div className="split-switch" role="group" aria-label="Tipo de reparto"><button type="button" aria-pressed={splitMode === "equal"} className={splitMode === "equal" ? "active" : ""} onClick={() => changeSplitMode("equal")}>A partes iguales</button><button type="button" aria-pressed={splitMode === "weighted"} className={splitMode === "weighted" ? "active" : ""} onClick={() => changeSplitMode("weighted")}>Proporcional</button></div>
@@ -423,12 +454,12 @@ function App() {
               <p className="summary-footnote">{IS_DEMO ? "Solo en este navegador. No se guarda la foto." : "El backend valida y recalcula antes de guardar."}</p>
             </section>
             <div className="tip-card"><span>✦</span><p><strong>Las pequeñas cuentas, claras.</strong> Compartid lo común y asignad lo personal a su propietario, aunque una sola persona pague toda la compra.</p></div>
-            <button type="button" className="text-button new-draft-button" disabled={locked} onClick={() => { if (!hasDraft || window.confirm("¿Descartar el borrador actual y empezar de nuevo?")) resetDraft(); }}>Limpiar borrador</button>
           </aside>
         </form> : <HistoryPanel expenses={expenses} disabled={locked || !historyReady} onDelete={removeExpense} onRefresh={refreshHistory} onClearDemo={clearDemoHistory} onSettlement={changeSettlement} />}
 
         <footer className="site-footer"><span className="brand-mini">a medias.</span><span>Hecho para compartir, no para complicarse.</span>{IS_DEMO && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={clearDemoHistory}>Borrar datos de la demo</button>}</footer>
       </main>
+      {cropSource && <CropDialog file={cropSource} onCancel={() => setCropSource(null)} onConfirm={acceptPhoto} />}
     </div>
   );
 }

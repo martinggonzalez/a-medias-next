@@ -1,22 +1,16 @@
 # A medias · Frontend Next.js
 
-Frontend independiente para gestionar gastos compartidos desde el móvil o el ordenador. No depende de Vento ni hace llamadas a Vento. Es una nueva implementación en Next.js, no el HTML de la versión anterior renombrado.
-
-## Alcance de este ZIP
-
-Incluye Next.js con App Router, React, TypeScript, CSS responsive, componentes, cliente HTTP, validación de respuestas, pruebas y documentación para conectar un backend Java con Spring Boot.
-
-**No incluye el backend Java, una base de datos, un servicio de usuarios ni una IA ejecutándose.** Los endpoints descritos son un contrato propuesto que debes implementar o adaptar en Spring Boot. No se han comprobado contra tu servidor real, porque todavía no se ha proporcionado.
+Frontend independiente para gestionar gastos compartidos desde el móvil o el ordenador. Es una implementación en Next.js.
 
 ### Funciones
 
 - Capturar una foto desde el móvil o seleccionar un JPG, PNG o WebP de hasta 8 MB.
 - Vista previa de la foto, sin enviarla automáticamente ni guardarla en el historial.
-- Lectura IA bajo demanda a través del backend, nunca directamente desde el navegador.
+- Lectura IA bajo demanda a través del backend.
 - Desglose editable de productos, casillas para incluirlos o excluirlos y altas/bajas manuales.
-- Selector por producto: compartido o 100 % para Adela o Martín.
+- Selector por producto: compartido o 100 % para todos los usuarios.
 - Descuentos como líneas negativas. Los importes son totales de línea, no precios unitarios.
-- Pareja con identidades fijas Adela (`adela`) y Martín (`martin`); reparto igual o proporcional con pesos enteros positivos.
+- Pareja con identidades fijas; reparto igual o proporcional con pesos enteros positivos.
 - Cálculos en céntimos, con distribución exacta del redondeo.
 - Historial mensual, detalle de productos, eliminación confirmada y exportación JSON.
 - Registro de quién sube cada ticket y quién ha pagado la compra. Se recuerda al registrador en este navegador.
@@ -36,7 +30,7 @@ En cada línea, **¿Para quién?** permite elegir **Compartido** o **Solo [nombr
 - Los descuentos pueden asignarse de la misma forma. No se permite guardar si dejan una cuota final negativa.
 - Los nombres e identificadores de la pareja son constantes entre tickets; no se editan ni se eliminan desde el formulario. Puedes ajustar los pesos de reparto.
 
-Ejemplo: 40 € compartidos y un producto de 10 € solo de Martín → **Adela: 20 €; Martín: 30 €**. Si Adela paga los 50 € en tienda, Martín le debe 30 €, no 25 €. Con pesos 60/40 → Adela: 24 €; Martín: 26 €. El coste propio y el dinero adelantado se muestran por separado.
+Ejemplo: 40 € compartidos y un producto de 10 € solo de user2 → **User1: 20 €; User2: 30 €**. Si User1 paga los 50 € en tienda, user2 le debe 30 €, no 25 €. Con pesos 60/40 → User1: 24 €; user2: 26 €. El coste propio y el dinero adelantado se muestran por separado.
 
 La asignación se conserva en el historial y en la exportación JSON. El historial anterior sin `ownerId` sigue siendo válido: sus líneas incluidas se interpretan como compartidas.
 
@@ -46,17 +40,17 @@ Pruebas específicas de productos personales: `npm run test:e2e -- tests/e2e/own
 
 ## Quién registra, quién paga y cómo se liquida
 
-Junto a «Empieza con un ticket» hay dos selectores. El primero permite elegir quién registra, Adela o Martín; se recuerda solo ese nombre en el navegador. Al cambiarlo, el pagador empieza con el mismo valor, pero puedes elegir al otro si solo estás subiendo su ticket. Esta elección no sustituye al login ni concede acceso a ninguna cuenta.
+Junto a «Empieza con un ticket» hay dos selectores. El primero permite elegir quién registra, User1 o User2; se recuerda solo ese nombre en el navegador. Al cambiarlo, el pagador empieza con el mismo valor, pero puedes elegir al otro si solo estás subiendo su ticket. Esta elección no sustituye al login ni concede acceso a ninguna cuenta.
 
 Cada ticket conserva `registeredById`, `paidById` y `settledAt`. El historial muestra total, subtotal compartido, individual y cuánto corresponde a cada persona. Todos los importes se refieren solo a los productos seleccionados. «Pagado en tienda» es el adelanto original de esos productos, no el gasto propio.
 
 - El **gasto mensual** se filtra por mes y moneda. Suma todos los tickets, también los liquidados.
 - El **saldo pendiente** compensa los importes de todos los tickets cargados sin liquidar de esa moneda, incluidos otros meses. No se calcula contando tickets ni convirtiendo monedas.
-- Ejemplo: Adela adelanta 60 € compartidos y Martín 20 € compartidos. Cada uno consume 40 €; Martín debe **20 € netos a Adela**.
+- Ejemplo: User1 adelanta 60 € compartidos y user2 20 € compartidos. Cada uno consume 40 €; user2 debe **20 € netos a User1**.
 - Marcar **«Pagado / Bizum hecho»** confirma que el reintegro completo de ese ticket ya se realizó o quedó compensado. No abre Bizum ni transfiere dinero. Desmarcarlo devuelve su deuda al saldo pendiente.
 - Si habéis pagado un saldo neto que agrupa varios tickets, marcad **todos** los tickets incluidos, también los que se compensaron en sentido contrario. No se admiten pagos parciales en esta versión.
 - Liquidar cambia únicamente lo pendiente: no borra el ticket, no reduce el gasto real y no altera los productos ni las cuotas. La fecha de liquidación queda guardada.
-- Los tickets antiguos sin identidad/pagador se conservan, pero no se les inventa una deuda. Se avisa y se desactiva su liquidación. Otros nombres antiguos no se asignan por posición a Adela o Martín.
+- Los tickets antiguos sin identidad/pagador se conservan, pero no se les inventa una deuda. Se avisa y se desactiva su liquidación. Otros nombres antiguos no se asignan por posición a User1 o user2.
 - La exportación JSON usa `a-medias-expenses-v2` e incluye identidad, propietario de cada producto y liquidación.
 
 En demo todo esto persiste en `localStorage`, únicamente en ese navegador. Para sincronizar los gastos y liquidaciones entre los dos móviles necesitas implementar y conectar el backend. El frontend exige que Spring Boot conserve las identidades al guardar y confirme la liquidación; no marca pagos solo en memoria si la API falla.
@@ -180,4 +174,3 @@ tests/e2e/                  Flujos de navegador en modo demo
 tests/e2e-api/              Flujos de navegador con backend simulado
 ```
 
-El ZIP incluye el lockfile para instalaciones reproducibles. No incluye dependencias descargadas, compilaciones, fotos, tickets reales, credenciales, claves de IA ni llamadas propietarias de Vento.
