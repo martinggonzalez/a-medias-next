@@ -376,7 +376,7 @@ function App() {
         <section className="hero">
           <div><p className="eyebrow">MENOS CONTAS. MENOS DISCUSIÓNS. MÁIS VIDA XUNTOS.</p><h1>O compartido,<br /><span>ben repartido.</span></h1><p className="hero-description">Un ticket, un par de checks e cada un coa su parte.<br className="desktop-only" /> Sin calculadora. Sin contas pendentes.</p></div>
           {/* <div className="hero-art" aria-hidden="true"><div className="art-circle" /><div className="mini-receipt"><Icon name="receipt" /><span>EL PLAN DE HOY</span><i /><i /><strong>A medias <span>✓</span></strong><div className="receipt-teeth" /></div><div className="art-badge">50 <small>/</small> 50</div><span className="art-spark">✦</span></div> */}
-          <div className="hero-art" aria-hidden="true"><Image src="/hero-art-not-background.png" alt="" width={926} height={520} style={{ width: "100%", height: "auto" }} priority /></div>
+          <div className="hero-art" aria-hidden="true"><Image src="/hero-art.png" alt="" width={926} height={520} style={{ width: "100%", height: "auto" }} priority /></div>
         </section>
 
         <div className={`environment-banner ${IS_DEMO ? "" : "api-banner"}`}><Icon name={IS_DEMO ? "receipt" : "lock"} /><p>{IS_DEMO ? <><strong>Estás probando una demo.</strong> El historial se guarda solo en este navegador y la IA no está conectada. Las fotos no se envían.</> : <><strong>Modo API · Spring Boot.</strong> La lectura envía la foto a tu backend; este podrá enviarla al proveedor de IA configurado.</>}</p></div>
