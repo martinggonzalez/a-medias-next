@@ -21,8 +21,12 @@ a { color: inherit; }
 .app-shell { max-width: 1220px; padding: 0 48px; margin: 0 auto; }
 .site-header { height: 98px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
 .brand { display: inline-flex; align-items: center; gap: 11px; font-size: 28px; font-weight: 750; letter-spacing: -1.3px; text-decoration: none; }
+/*
 .brand-mark { display: inline-block; position: relative; width: 37px; height: 37px; border-radius: 12px; background: var(--purple); transform: rotate(-8deg); flex-shrink: 0; }
 .brand-mark::before { content: ""; position: absolute; top: 9px; left: 9px; width: 19px; height: 19px; border-radius: 50%; background: linear-gradient(90deg, var(--green) 0 46%, var(--purple) 46% 54%, #fff 54%); }
+*/
+.brand-mark { display: inline-block; width: 37px; height: 37px; border-radius: 12px; background: url("/icon-192.png") center / cover no-repeat; flex-shrink: 0; }
+
 .brand-dot { color: var(--purple); }
 .header-actions { display: flex; align-items: center; gap: 14px; }
 .mode-pill { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border); background: #fff; padding: 8px 12px; border-radius: 30px; color: #656176; font-size: 11px; font-weight: 600; }
@@ -256,7 +260,7 @@ h2 { font-size: 17px; font-weight: 650; letter-spacing: -.4px; }
   .site-header { height: 78px; }
   .brand { font-size: 25px; gap: 9px; }
   .brand-mark { width: 34px; height: 34px; border-radius: 11px; }
-  .brand-mark::before { top: 8px; left: 8px; width: 18px; height: 18px; }
+  /* .brand-mark::before { top: 8px; left: 8px; width: 18px; height: 18px; } */
   .mode-pill { font-size: 9px; padding: 7px 9px; }
   .header-actions { gap: 6px; }
   .hero { min-height: auto; padding: 32px 0 29px; }
