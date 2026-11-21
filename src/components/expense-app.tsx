@@ -6,8 +6,10 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Fo
 import * as api from "@/lib/api";
 import { createDemoExpense, DEMO_STORAGE_KEY, loadDemoExpenses, persistDemoExpenses, setDemoSettlement } from "@/lib/demo";
 import { amountInput, blankLine, coupleMembers, currencies, defaultParticipants, localDate, makeExpenseInput, MAX_LINES, money, sampleReceipt, splitItems, toCents, validateImage, type CoupleMemberId, type Currency, type DraftLine, type Expense, type Participant, type Receipt, type SplitMode } from "@/lib/domain";
+import { memberAvatars } from "@/lib/avatars";
 import { memberName, summarizeLedger, ticketDebt } from "@/lib/ledger";
 import { CURRENT_MEMBER_KEY, loadCurrentMember } from "@/lib/preferences";
+import { memberIdFromToken } from "@/lib/session";
 import { prepareImage } from "@/lib/image-prepare";
 import { CropDialog } from "./crop-dialog";
 import { Icon } from "./icon";
@@ -15,7 +17,7 @@ import { Icon } from "./icon";
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 const subscribe = () => () => undefined;
 type Notice = { kind: "error" | "success" | "info"; message: string };
-type Session = { token: string; expiresAt: number };
+type Session = { token: string; expiresAt: number; memberId: CoupleMemberId | null };
 
 function readInitialMember(): CoupleMemberId {
   try {
@@ -156,7 +158,12 @@ function App() {
     await runTask("Iniciando sesión", async () => {
       const response = await api.login(email, password);
       tokenRef.current = response.accessToken;
-      setSession({ token: response.accessToken, expiresAt: Date.now() + response.expiresIn * 1000 });
+      const memberId = memberIdFromToken(response.accessToken, coupleMembers.map((person) => person.id));
+      setSession({ token: response.accessToken, expiresAt: Date.now() + response.expiresIn * 1000, memberId });
+      if (memberId) {
+        setRegisteredById(memberId);
+        setPaidById(memberId);
+      }
       const history = await api.listExpenses(response.accessToken);
       if (tokenRef.current !== response.accessToken) return;
       setExpenses(history.items);
@@ -369,7 +376,7 @@ function App() {
     <div className="app-shell">
       <header className="site-header">
         <Link className="brand" href="/" aria-label="A medias, inicio" onClick={() => setTab("new")}><span className="brand-mark" /><span>a medias<span className="brand-dot">.</span></span></Link>
-        <div className="header-actions"><span className={`mode-pill ${IS_DEMO ? "demo" : ""}`}><span />{IS_DEMO ? "Modo demo" : "Tu espacio compartido"}</span>{session && <button type="button" className="icon-button" aria-label="Cerrar sesión" onClick={logout} disabled={Boolean(busy)}><Icon name="logout" /></button>}</div>
+        <div className="header-actions"><div className="header-identity"><span className={`mode-pill ${IS_DEMO ? "demo" : ""}`}><span />{IS_DEMO ? "Modo demo" : "Tu espacio compartido"}</span>{session?.memberId && <span className="user-chip" data-testid="current-user"><Image className="avatar" src={memberAvatars[session.memberId]} alt="" width={26} height={26} unoptimized />{memberName(session.memberId)}</span>}</div>{session && <button type="button" className="icon-button" aria-label="Cerrar sesión" onClick={logout} disabled={Boolean(busy)}><Icon name="logout" /></button>}</div>
       </header>
 
       <main className="main-content">
@@ -456,7 +463,7 @@ function App() {
             </section>
             <div className="tip-card"><span>✦</span><p><strong>Las pequeñas cuentas, claras.</strong> Compartid lo común y asignad lo personal a su propietario, aunque una sola persona pague toda la compra.</p></div>
           </aside>
-        </form> : <HistoryPanel expenses={expenses} disabled={locked || !historyReady} onDelete={removeExpense} onRefresh={refreshHistory} onClearDemo={clearDemoHistory} onSettlement={changeSettlement} />}
+        </form> : <HistoryPanel me={session?.memberId ?? null} expenses={expenses} disabled={locked || !historyReady} onDelete={removeExpense} onRefresh={refreshHistory} onClearDemo={clearDemoHistory} onSettlement={changeSettlement} />}
 
         <footer className="site-footer"><span className="brand-mini">a medias.</span><span>Hecho para compartir, no para complicarse.</span>{IS_DEMO && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={clearDemoHistory}>Borrar datos de la demo</button>}</footer>
       </main>
@@ -480,7 +487,7 @@ function LoginPanel({ onLogin, busy }: { onLogin: (email: string, password: stri
   return <section className="card login-panel"><div><span className="login-icon"><Icon name="lock" /></span><h2>Vuestro espacio privado</h2><p>Inicia sesión con una cuenta creada en tu backend. Este frontend no incluye un servidor de usuarios.</p></div><form onSubmit={(event) => void submit(event)}><label>Email<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} required disabled={busy} /></label><label>Contraseña<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} maxLength={200} required disabled={busy} /></label><button className="button primary" disabled={busy}>Entrar<Icon name="arrow" /></button></form></section>;
 }
 
-function HistoryPanel({ expenses, disabled, onDelete, onRefresh, onClearDemo, onSettlement }: { expenses: Expense[]; disabled: boolean; onDelete: (expense: Expense) => Promise<void>; onRefresh: () => Promise<void>; onClearDemo: () => void; onSettlement: (expense: Expense, settled: boolean) => Promise<void> }) {
+function HistoryPanel({ me, expenses, disabled, onDelete, onRefresh, onClearDemo, onSettlement }: { me: CoupleMemberId | null; expenses: Expense[]; disabled: boolean; onDelete: (expense: Expense) => Promise<void>; onRefresh: () => Promise<void>; onClearDemo: () => void; onSettlement: (expense: Expense, settled: boolean) => Promise<void> }) {
   const [month, setMonth] = useState(() => localDate().slice(0, 7));
   const [currency, setCurrency] = useState<Currency>("EUR");
   const visible = expenses.filter((expense) => expense.date.startsWith(month) && expense.currency === currency).sort((first, second) => second.date.localeCompare(first.date) || second.createdAt.localeCompare(first.createdAt));
@@ -519,9 +526,10 @@ function HistoryPanel({ expenses, disabled, onDelete, onRefresh, onClearDemo, on
     </section>
     {visible.length === 0 ? <div className="empty-state card"><span className="upload-icon"><Icon name="receipt" /></span><h3>Todavía no hay gastos para este mes</h3><p>Guarda vuestro primer ticket o elige otro mes y moneda.</p></div> : <div className="expense-list">{visible.map((expense) => {
       const debt = ticketDebt(expense);
+      const myDebt = me !== null && debt !== null && debt.from === me && debt.amountCents > 0 && !expense.settledAt ? debt : null;
       const shared = expense.items.filter((item) => item.selected && item.ownerId == null).reduce((sum, item) => sum + item.amountCents, 0);
-      return <article className={`card expense-card ${expense.settledAt ? "settled" : ""}`} key={expense.id}>
-      <div className="expense-card-top"><span className="expense-icon"><Icon name="receipt" /></span><div className="expense-title"><h3>{expense.merchant}</h3><p>{new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${expense.date}T12:00:00`))} · {expense.items.filter((item) => item.selected).length} productos incluidos</p></div><strong className="expense-amount">{money(expense.totalCents, expense.currency)}</strong><button type="button" className="icon-button delete-button" disabled={disabled} aria-label={`Eliminar gasto de ${expense.merchant}`} onClick={() => void onDelete(expense)}><Icon name="trash" /></button></div>
+      return <article className={`card expense-card ${expense.settledAt ? "settled" : ""} ${myDebt ? "owed-by-me" : ""}`} key={expense.id}>
+      <div className="expense-card-top"><span className="expense-icon"><Icon name="receipt" /></span><div className="expense-title"><h3>{expense.merchant}</h3><p>{new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${expense.date}T12:00:00`))} · {expense.items.filter((item) => item.selected).length} productos incluidos</p>{myDebt && <p className="debt-note">Debes {money(myDebt.amountCents, expense.currency)} a {memberName(myDebt.to)}</p>}</div>{myDebt && <span className="pending-pill" data-testid="my-debt">Pendiente</span>}<strong className="expense-amount">{money(expense.totalCents, expense.currency)}</strong><button type="button" className="icon-button delete-button" disabled={disabled} aria-label={`Eliminar gasto de ${expense.merchant}`} onClick={() => void onDelete(expense)}><Icon name="trash" /></button></div>
       <div className="expense-shares">{expense.shares.map((share) => <span key={share.participantId}>{share.name}<strong>{money(share.amountCents, expense.currency)}</strong></span>)}</div>
       <div className="ticket-subtotals"><span>Compartido: <strong>{money(shared, expense.currency)}</strong></span><span>Individual: <strong>{money(expense.totalCents - shared, expense.currency)}</strong></span></div>
       <p className="ticket-provenance">Registrado por {expense.registeredById ? memberName(expense.registeredById) : "sin registrar"} · Pagó {expense.paidById ? memberName(expense.paidById) : "sin registrar"}</p>

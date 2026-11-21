@@ -331,3 +331,12 @@ h2 { font-size: 17px; font-weight: 650; letter-spacing: -.4px; }
 @media (max-width: 360px) { .app-shell { padding: 0 12px; } h1 { font-size: 33px; } .card { padding: 22px 15px; } .product-row { grid-template-columns: 18px minmax(0, 1fr) 78px 22px; gap: 5px; } .product-row .product-name { font-size: 12px; } .mode-pill { font-size: 8px; } }
 @media (max-width: 740px) { input:not([type="checkbox"]), select, .product-row .product-name, .amount-field input, .participant-name input, .weight-field input, .receipt-fields input, .receipt-fields select, .history-filters input, .history-filters select { font-size: 16px; } .amount-field span { padding-right: 6px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Sesión: quién ha iniciado sesión y deudas propias en el historial */
+.header-identity { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px 3px 3px; border: 1px solid var(--border); border-radius: 30px; background: #fff; color: var(--ink); font-size: 12px; font-weight: 600; }
+.user-chip .avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+.pending-pill { align-self: flex-start; flex-shrink: 0; padding: 5px 12px; border-radius: 999px; background: #c8413f; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.3; white-space: nowrap; }
+.expense-title .debt-note { margin-top: 6px; color: #c8413f; font-size: 12px; font-weight: 600; }
+.expense-card.owed-by-me { border-left: 3px solid #c8413f; }
+@media (max-width: 640px) { .user-chip { font-size: 11px; } .pending-pill { font-size: 10px; padding: 4px 9px; } }
